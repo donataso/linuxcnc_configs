@@ -1,5 +1,5 @@
-# Basic HAL config file for NVEM controller board running Remora firmware
-# Configured for 3 joints (A, Y, Z axes) with home and limit switches
+# Basic HAL config file for Flexi-HAL+uFlexiNET controller board running Remora firmware
+# Configured for 4 joints (A, Y1, Y2, Z axes) with home switches and enables
 
 loadrt [KINS]KINEMATICS
 loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS
@@ -8,12 +8,19 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 
 	loadrt remora-nv
 
+# load additional realtime components
 
-# estop and SPI comms enable and feedback
+	loadrt not names=stepen_not,stepen_z_not
+	loadrt estop_latch names=estop_latch
+	loadrt and2 names=run_and,step_and
+	loadrt toggle names=hold_button_toggle
+	loadrt toggle2nist names=hold_toggle,paused_toggle	
+
+# estop and comms enable and feedback
 
 	net user-enable-out		<= iocontrol.0.user-enable-out		=> remora.enable
 	net user-request-enable <= iocontrol.0.user-request-enable	=> remora.reset
-	net remora-status 		<= remora.status 				=> iocontrol.0.emc-enable-in
+	net remora-status 		<= remora.status 					=> iocontrol.0.emc-enable-in
 
 
 # add the remora and motion functions to threads
@@ -23,9 +30,45 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 	addf motion-controller 		servo-thread
 	addf remora.update-freq 	servo-thread
 	addf remora.write 			servo-thread
+	addf stepen_not servo-thread
+	addf stepen_z_not servo-thread
+	addf estop_latch servo-thread
+	addf run_and servo-thread
+	addf step_and servo-thread
+	addf hold_toggle servo-thread
+	addf hold_button_toggle servo-thread	
 
+#toggle2nist states & mux selectors
+	net program-is-paused hold_toggle.is-on <= halui.program.is-paused
+	
+# vfdmod - uncomment the below if using vfdmod (default). There are also a couple items to edit in spindle_load.hal
+	#loadusr -W vfdmod vfdmod.ini
+	#net spindle-speed-cmd vfdmod.spindle.rpm-in <= spindle.0.speed-out
+	#net spindle-speed-fb vfdmod.spindle.rpm-out <= spindle.0.speed-in
+	#net spindle-at-speed vfdmod.spindle.at-speed <= spindle.0.at-speed
+	#net spindle-forward vfdmod.control.run-forward <= spindle.0.forward
+	#net spindle-reverse vfdmod.control.run-reverse <= spindle.0.reverse
 
-# joint 0 setup (X axis)
+# hy_vfd - uncomment the below if using hy_vfd. There are also a couple items to edit in spindle_load.hal
+	#loadusr -Wn vfd hy_vfd -n vfd -d /dev/ttyAMA1 -p none -S24000 -r 9600 -s 1
+	#setp vfd.enable 1
+	#net spindle-speed-cmd vfd.speed-command <= spindle.0.speed-out
+	#net spindle-speed-fb vfd.spindle-speed-fb <= spindle.0.speed-in
+	#net spindle-at-speed vfd.spindle-at-speed <= spindle.0.at-speed
+	#net spindle-forward vfd.spindle-forward <= spindle.0.forward
+	#net spindle-reverse vfd.spindle-reverse <= spindle.0.reverse
+	#net spindle-on vfd.spindle-on <= spindle.0.on
+	#net spindle-comm-ok <= vfd.hycomm-ok	
+
+# Analog spindle control - Uncomment if using PWM or analog. You will also need to comment out spindle_load.hal in postgui_call_list.hal.
+	#loadrt scale names=spindle_speed_scale
+	#addf spindle_speed_scale servo-thread
+	#setp spindle_speed_scale.gain 0.004167 # volts per RPM, calculated over full scale. [max output voltage]/[Max spindle speed] * 10 Example: 0-10V, 24000 rpm: (10/24000) * 10 = 0.004167
+	#net spindle-scale-in spindle.0.speed-out => spindle_speed_scale.in
+	#net spindle-speed-scaled spindle_speed_scale.out => remora.SP.SPINDLE_PWM
+	#net spindle-enable spindle.0.on => remora.output.SPINDLE_EN	
+
+# joint 0 setup
 
 	setp remora.joint.0.scale 		[JOINT_0]SCALE
 	setp remora.joint.0.maxaccel 	[JOINT_0]STEPGEN_MAXACCEL
@@ -36,8 +79,9 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 	net j0pos-fb 		remora.joint.0.pos-fb 	=> joint.0.motor-pos-fb
 	net j0enable 		joint.0.amp-enable-out 	=> remora.joint.0.enable
 
+	net x-home joint.0.home-sw-in => remora.input.X_Limit
 
-# joint 1 setup (Y axis)
+# joint 1 setup
 
 	setp remora.joint.1.scale 		[JOINT_1]SCALE
 	setp remora.joint.1.maxaccel 	[JOINT_1]STEPGEN_MAXACCEL
@@ -47,15 +91,88 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 	net j1pos-cmd 		joint.1.motor-pos-cmd 	=> remora.joint.1.pos-cmd
 	net j1pos-fb 		remora.joint.1.pos-fb 	=> joint.1.motor-pos-fb
 	net j1enable 		joint.1.amp-enable-out 	=> remora.joint.1.enable
+	
+	net y-home joint.1.home-sw-in => remora.input.Y_Limit	
+	
+# joint 2 setup
+
+	setp remora.joint.1.scale 		[JOINT_2]SCALE
+	setp remora.joint.1.maxaccel 	[JOINT_2]STEPGEN_MAXACCEL
+	setp remora.joint.1.pgain		300
+	setp remora.joint.1.ff1gain			.2
+
+	net j1pos-cmd 		joint.2.motor-pos-cmd 	=> remora.joint.2.pos-cmd
+	net j1pos-fb 		remora.joint.2.pos-fb 	=> joint.2.motor-pos-fb
+	net j1enable 		joint.2.amp-enable-out 	=> remora.joint.2.enable	
+	
+	net z-home joint.2.home-sw-in => remora.input.Z_Limit	
 
 
-# joint 2 setup (Z axis)
+# joint 3 setup
 
-	setp remora.joint.2.scale 		[JOINT_2]SCALE
-	setp remora.joint.2.maxaccel 	[JOINT_2]STEPGEN_MAXACCEL
+	setp remora.joint.2.scale 		[JOINT_3]SCALE
+	setp remora.joint.2.maxaccel 	[JOINT_3]STEPGEN_MAXACCEL
 	setp remora.joint.2.pgain		300
 	setp remora.joint.2.ff1gain			.2
 
-	net j2pos-cmd 		joint.2.motor-pos-cmd 	=> remora.joint.2.pos-cmd
-	net j2pos-fb 		remora.joint.2.pos-fb 	=> joint.2.motor-pos-fb
-	net j2enable 		joint.2.amp-enable-out 	=> remora.joint.2.enable
+	net j3pos-cmd 		joint.3.motor-pos-cmd 	=> remora.joint.3.pos-cmd
+	net j3pos-fb 		remora.joint.3.pos-fb 	=> joint.3.motor-pos-fb
+	net j3enable 		joint.3.amp-enable-out 	=> remora.joint.3.enable
+	
+	net A-home joint.3.home-sw-in => remora.input.A_Limit	
+	
+# joint 4 setup
+
+#	setp remora.joint.2.scale 		[JOINT_4]SCALE
+#	setp remora.joint.2.maxaccel 	[JOINT_4]STEPGEN_MAXACCEL
+#	setp remora.joint.2.pgain		300
+#	setp remora.joint.2.ff1gain			.2
+#
+#	net j3pos-cmd 		joint.4.motor-pos-cmd 	=> remora.joint.4.pos-cmd
+#	net j3pos-fb 		remora.joint.4.pos-fb 	=> joint.4.motor-pos-fb
+#	net j3enable 		joint.4.amp-enable-out 	=> remora.joint.4.enable
+#	
+#	net b-home joint.4.home-sw-in => remora.input.B_Limit
+
+# Motor enables
+
+	#inverted 
+	#net j0enable => stepen_not.in
+	#net stepen_inv stepen_not.out <= remora.output.STEP_EN
+	#net j2enable => stepen_z_not.in
+	#net stepen_z_inv stepen_z_not.out <= remora.output.STEP_EN_Z
+
+	#non-inverted
+	net j0enable => remora.output.XYAB_EN
+	net j2enable => remora.output.Z_EN
+
+# Flood and mist outputs
+	net flood remora.output.FLOOD <= iocontrol.0.coolant-flood
+	net mist remora.output.MIST <= iocontrol.0.coolant-mist
+	
+# User buttons
+	#Halt is shared with motor alarms and is up in the estop loop.
+
+	#Hold logic
+	net hold_button remora.input.HOLD => hold_button_toggle.in
+	net hold_toggle_latch hold_button_toggle.out => hold_toggle.in
+	net hold_on halui.program.pause <= hold_toggle.on
+	net hold_off halui.program.resume <= hold_toggle.off
+
+	#Cycle start logic. When not running, start the program. When in feed hold, single step through the program.
+	net run-step_button remora.input.RUN => run_and.in0 step_and.in0
+	net program-is-idle halui.program.is-idle => run_and.in1 #if not running AND button pressed
+	net program-run run_and.out => halui.program.run #run program
+	net program-is-paused => step_and.in1 #if paused AND button pressed
+	net single-step step_and.out => halui.program.step #single step
+	
+# Probe
+	net probe motion.probe-input <= remora.input.PROBE
+
+# Manual toolchange
+
+	loadusr -W hal_manualtoolchange
+	net tool-change iocontrol.0.tool-change => hal_manualtoolchange.change
+	net tool-changed iocontrol.0.tool-changed <= hal_manualtoolchange.changed
+	net tool-number iocontrol.0.tool-prep-number => hal_manualtoolchange.number
+	net tool-prepare-loopback iocontrol.0.tool-prepare => iocontrol.0.tool-prepared	
