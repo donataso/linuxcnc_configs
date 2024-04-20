@@ -30,12 +30,12 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 	net program-is-paused hold_toggle.is-on <= halui.program.is-paused
 
 # vfdmod - uncomment the below if using vfdmod (default). There are also a couple items to edit in spindle_load.hal
-	loadusr -W vfdmod vfdmod.ini
-	net spindle-speed-cmd vfdmod.spindle.rpm-in <= spindle.0.speed-out
-	net spindle-speed-fb vfdmod.spindle.rpm-out <= spindle.0.speed-in
-	net spindle-at-speed vfdmod.spindle.at-speed <= spindle.0.at-speed
-	net spindle-forward vfdmod.control.run-forward <= spindle.0.forward
-	net spindle-reverse vfdmod.control.run-reverse <= spindle.0.reverse
+#	loadusr -W vfdmod vfdmod.ini
+#	net spindle-speed-cmd vfdmod.spindle.rpm-in <= spindle.0.speed-out
+#	net spindle-speed-fb vfdmod.spindle.rpm-out <= spindle.0.speed-in
+#	net spindle-at-speed vfdmod.spindle.at-speed <= spindle.0.at-speed
+#	net spindle-forward vfdmod.control.run-forward <= spindle.0.forward
+#	net spindle-reverse vfdmod.control.run-reverse <= spindle.0.reverse
 
 # hy_vfd - uncomment the below if using hy_vfd. There are also a couple items to edit in spindle_load.hal
 	#loadusr -Wn vfd hy_vfd -n vfd -d /dev/ttyAMA1 -p none -S24000 -r 9600 -s 1
@@ -71,9 +71,6 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 
 	setp remora.joint.0.scale 		[JOINT_0]SCALE
 	setp remora.joint.0.maxaccel 	[JOINT_0]STEPGEN_MAXACCEL
-	setp remora.joint.0.pgain 		[JOINT_0]P_GAIN
-	setp remora.joint.0.ff1gain 	[JOINT_0]FF1_GAIN
-	setp remora.joint.0.deadband 	[JOINT_0]DEADBAND
 
 	net j0pos-cmd 		joint.0.motor-pos-cmd 	=> remora.joint.0.pos-cmd
 	net j0pos-fb 		remora.joint.0.pos-fb 	=> joint.0.motor-pos-fb
@@ -108,6 +105,20 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 	net j2enable 		joint.2.amp-enable-out 	=> remora.joint.2.enable
 	
 	net z-home joint.2.home-sw-in => remora.input.02
+
+# joint 3 setup (Y2 axis)
+
+	setp remora.joint.3.scale 		[JOINT_3]SCALE
+	setp remora.joint.3.maxaccel 	[JOINT_3]STEPGEN_MAXACCEL
+	setp remora.joint.3.pgain 		[JOINT_3]P_GAIN
+	setp remora.joint.3.ff1gain 	[JOINT_3]FF1_GAIN
+	setp remora.joint.3.deadband 	[JOINT_3]DEADBAND
+
+	net j3pos-cmd 		joint.3.motor-pos-cmd 	=> remora.joint.3.pos-cmd
+	net j3pos-fb 		remora.joint.3.pos-fb 	=> joint.3.motor-pos-fb
+	net j3enable 		joint.3.amp-enable-out 	=> remora.joint.3.enable
+
+	net y2-home joint.3.home-sw-in => remora.input.03
 
 # Motor enables
 
