@@ -75,6 +75,9 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 	net j0pos-cmd 		joint.0.motor-pos-cmd 	=> remora.joint.0.pos-cmd
 	net j0pos-fb 		remora.joint.0.pos-fb 	=> joint.0.motor-pos-fb
 	net j0enable 		joint.0.amp-enable-out 	=> remora.joint.0.enable
+	setp remora.joint.0.pgain 		[JOINT_0]P_GAIN
+	setp remora.joint.0.ff1gain 	[JOINT_0]FF1_GAIN
+	setp remora.joint.0.deadband 	[JOINT_0]DEADBAND
 	
 	net x-home joint.0.home-sw-in => remora.input.00
 
